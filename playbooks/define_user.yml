@@ -1,0 +1,17 @@
+---
+- name: "Define user and authorized ssh keys"
+  hosts: gloin
+  become: true
+  tasks:
+  - name: "Find the user"
+    ansible.builtin.user:
+      name: "{{user_name}}"
+      state: present
+      update_password: on_create
+
+  - name: "Set up authorized keys"
+    ansible.builtin.authorized_key:
+      user: "{{user_name}}"
+      key: "{{user_ssh_keys | join(\n)}}"
+      state: present
+      exclusive: true
