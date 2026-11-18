@@ -4,3 +4,4 @@
 # The imported playbooks must be idempotent as site.yml may be run repeatedly for periodic remediation.
 - import_playbook: playbooks/install_cowsay_epel.yml
 - import_playbook: playbooks/define_user.yml
+- import_playbook: playbooks/samba.yml

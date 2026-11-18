@@ -1,0 +1,19 @@
+# Spravovano nastrojem Ansible - neupravujte rucne
+
+[global]
+    workgroup = {{ samba_workgroup }}
+    server string = {{ samba_server_string }}
+    security = {{ samba_security }}
+    map to guest = {{ samba_map_to_guest }}
+    log file = {{ samba_log_file }}
+    max log size = {{ samba_max_log_size }}
+    hosts allow = 127. ::1 {% for net in samba_allowed_networks %}{{ net.cidr }} {% endfor %}
+
+{% for share in samba_shares %}
+[{{ share.name }}]
+    path = {{ share.path }}
+{% for key, value in share.properties.items() %}
+    {{ key }} = {{ value }}
+{% endfor %}
+
+{% endfor %}

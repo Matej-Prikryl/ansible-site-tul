@@ -1,0 +1,104 @@
+---
+- name: Samba server installation and configuration
+  hosts: servers
+  become: true
+
+  vars:
+    samba_user: smbuser
+    samba_allowed_networks:
+      - family: ipv4
+        cidr: 147.230.0.0/16
+      - family: ipv6
+        cidr: 2001:718:1c01::/48
+
+    samba_workgroup: WORKGROUP
+    samba_server_string: "Samba Server %v"
+    samba_security: user
+    samba_map_to_guest: "Bad User"
+    samba_log_file: "/var/log/samba/log.%m"
+    samba_max_log_size: 50
+
+    samba_shares:
+      - name: private
+        path: /srv/samba/private
+        owner: "{{ samba_user }}"
+        group: "{{ samba_user }}"
+        mode: "0770"
+        properties:
+          comment: Private share for Samba user
+          browseable: "yes"
+          writable: "yes"
+          guest ok: "no"
+          valid users: "{{ samba_user }}"
+      - name: public
+        path: /srv/samba/public
+        owner: root
+        group: root
+        mode: "0755"
+        properties:
+          comment: Public read-only directory
+          browseable: "yes"
+          writable: "no"
+          guest ok: "yes"
+
+  tasks:
+    - name: Samba packages installation
+      ansible.builtin.dnf:
+        name:
+          - samba
+          - samba-common
+          - samba-client
+        state: present
+
+    - name: Create Samba system user
+      ansible.builtin.user:
+        name: "{{samba_user}}"
+        shell: /sbin/nologin
+        create_home: false
+        state: present
+
+    - name: Create shared directories with SELinux context
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+        setype: samba_share_t
+      loop: "{{ samba_shares }}"
+
+    - name: Configure smb.conf from Jinja2 template
+      ansible.builtin.template:
+        src: smb.conf.j2
+        dest: /etc/samba/smb.conf
+        owner: root
+        group: root
+        mode: "0644"
+        validate: testparm -s %s
+      notify: Restart smb
+
+    - name: Verify firewalld is running
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Allow Samba service only from TUL network
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="{{ item.family }}" source address="{{ item.cidr }}" service name="samba" accept'
+        permanent: true
+        immediate: true
+        state: enabled
+      loop: "{{ samba_allowed_networks }}"
+
+    - name: Launch smb on start
+      ansible.builtin.systemd:
+        name: smb
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart smb
+      ansible.builtin.systemd:
+        name: smb
+        state: restarted
