@@ -1,0 +1,30 @@
+---
+- name: Configure NFS client
+  hosts: gloin
+  become: true
+
+  vars:
+    nfs_server_host: "esgaroth.nti.tul.cz"
+    nfs_remote_path: "/srv/nfs/sdilene"
+    nfs_local_path: "/mnt/nfs_esgaroth"
+    nfs_mount_options: "rw,sync,hard,_netdev"
+  
+  tasks:
+    - name: Install NFS packages
+      ansible.builtin.dnf:
+        name: nfs-utils
+        state: present
+  
+    - name: Create local mount directory
+      ansible.builtin.file:
+        path: "{{ nfs_local_path }}"
+        state: directory
+        mode: "777"
+  
+    - name: Mount remote to local directory
+      ansible.posix.mount:
+        src: "{{ nfs_server_host }}:{{ nfs_remote_path }}"
+        path: "{{ nfs_local_path }}"
+        fstype: nfs
+        opts: "{{ nfs_mount_options }}"
+        state: mounted

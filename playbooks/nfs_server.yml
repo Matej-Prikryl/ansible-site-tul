@@ -1,0 +1,58 @@
+---
+- name: Configure NFS server
+  hosts: gloin
+  become: true
+
+  vars:
+    nfs_share_dir: /srv/nfs/share
+    nfs_allowed_ip: "2001:718:1c01:21:250:56ff:fe8e:dbf"
+    nfs_export_options: "rw,sync"
+    nfs_firewall_zone: home
+
+  tasks:
+  - name: Install NFS server packages
+    ansible.builtin.dnf:
+      name: nfs-utils
+      state: present
+
+  - name: Create NFS directory
+    ansible.builtin.file:
+      path: "{{ nfs_share_dir }}"
+      state: directory
+      owner: parzival
+      group: parzival
+      mode: "0777"
+
+  - name: Configure export directory
+    ansible.builtin.lineinfile:
+      path: /etc/exports
+      regexp: "^{{ nfs_share_dir }}\\s+"
+      line: "{{ nfs_share_dir }} {{ nfs_allowed_ip }}/128({{ nfs_export_options }})"
+      state: present
+      create: true
+      mode: "0644"
+    notify: Reload NFS exports
+
+  - name: Start and enable NFS server
+    ansible.builtin.service:
+      name: nfs-server
+      state: started
+      enabled: true
+
+  - name: Allow NFS in firewalld only from the client
+    ansible.posix.firewalld:
+      zone: "{{ nfs_firewall_zone }}"
+      rich_rule: 'rule family="ipv6" source address="{{ nfs_allowed_ip }}/128" service name="{{ item }}" accept'
+      permanent: true
+      state: enabled
+      immediate: true
+    loop:
+      - nfs
+      - rpc-bind
+      - mountd
+
+  handlers:
+  - name: Reload NFS exports
+    ansible.builtin.command:
+      cmd: exportfs -ra
+    changed_when: true

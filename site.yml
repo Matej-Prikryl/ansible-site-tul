@@ -5,3 +5,5 @@
 - import_playbook: playbooks/install_cowsay_epel.yml
 - import_playbook: playbooks/define_user.yml
 - import_playbook: playbooks/samba.yml
+- import_playbook: playbooks/nfs_server.yml
+- import_playbook: playbooks/nfs_client.yml
